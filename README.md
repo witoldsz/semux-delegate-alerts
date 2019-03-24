@@ -13,6 +13,8 @@ This app is written in Haskell and built using `stack`. Just install _The Haskel
 ```sh
 #!/bin/sh
 
+touch ./db_NotForgingDelegates.txt
+
 SEMUX_API="https://api.semux.online/v2.1.0/" \
 ALERT_AFTER_SECS=3600 \
 DELEGATE="…delegate address" \

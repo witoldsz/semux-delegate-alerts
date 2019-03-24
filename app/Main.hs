@@ -1,43 +1,57 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 
 module Main where
 
-import Semux (getLastCoinbase)
-import Discord (alert)
+import ClassyPrelude
+import Text.Read
+import Semux
+import Db
+import Discord (publish)
 import System.Environment
 import Data.Time.Clock
+import Control.Monad (when)
 
 main :: IO ()
 main = do
-  semuxApi <- getEnv "SEMUX_API"
-  delegate <- getEnv "DELEGATE"
-  webhookUrl <- getEnv "WEBHOOK_URL"
+  semuxApi       <-          getEnv "SEMUX_API"
+  webhookUrl     <-          getEnv "WEBHOOK_URL"
+  delegate       <- pack <$> getEnv "DELEGATE"
   alertAfterSecs <- read <$> getEnv "ALERT_AFTER_SECS" :: IO Int
 
-  lastCoinbase <- getLastCoinbase semuxApi delegate
-  now <- getCurrentTime
-  let diff = diffSeconds now lastCoinbase
+  now              <- getCurrentTime
+  lastCoinbase     <- getLastCoinbase semuxApi delegate
+  let diff         =  now `minus` lastCoinbase
+  let isNotForging =  diff > alertAfterSecs
 
-  if (diff > alertAfterSecs)
-    then do
-      let msg = alertMessage delegate lastCoinbase diff
-      alert webhookUrl msg
+  notForgingDelegates <- readNotForgingDelegates
+  let wasNotForging   =  delegate `elem` notForgingDelegates
+
+  (delegateDescr, _) <- getDelegateInfo semuxApi delegate
+  -- TODO: new feature: publish warning when rank is too low
+
+  case (isNotForging, wasNotForging) of
+
+    (True, False) -> do
+      let msg =
+            delegateDescr
+              <> " hasn't forged since `" <> tshow lastCoinbase <> "`"
+              <> " (" <> tshow diff <> "s ago)."
+      publish webhookUrl msg
       putStrLn msg
-    else
-      putStrLn $ "Last COINBASE was " ++ show lastCoinbase ++ " that is " ++ show diff ++ " seconds ago. OK."
+      writeNotForgingDelegates (delegate : notForgingDelegates)
 
-diffSeconds :: UTCTime -> UTCTime -> Int
-diffSeconds t1 t2 =
-  let (res, _) = properFraction $ diffUTCTime t1 t2
-  in res
+    (False, True) -> do
+      let msg =
+            delegateDescr <> " is OK, has forged " <> tshow diff <> "s ago."
+      publish webhookUrl msg
+      putStrLn msg
+      writeNotForgingDelegates $ filter (/= delegate) notForgingDelegates
 
-alertMessage :: String -> UTCTime -> Int -> String
-alertMessage delegate lastCoinbase diff =
-  "Alert! `"
-    ++ delegate
-    ++ "` hasn't forged since `"
-    ++ show lastCoinbase
-    ++ "` (i.e. "
-    ++ show diff
-    ++ " seconds ago). This isn't good."
+    _ ->
+      putStrLn $ delegateDescr
+        <> " COINBASE=" <> tshow lastCoinbase
+        <> " " <> tshow diff <> "s"
+
+minus :: UTCTime -> UTCTime -> Int
+minus t1 t2 =
+  fst $ properFraction $ diffUTCTime t1 t2
