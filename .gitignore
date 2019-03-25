@@ -2,3 +2,6 @@
 semux-delegate-alerts.cabal
 *~
 /start.sh
+/env.sh
+/repl.sh
+/db_NotForgingDelegates.txt

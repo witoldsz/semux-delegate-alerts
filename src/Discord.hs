@@ -1,17 +1,18 @@
-{-# LANGUAGE OverloadedStrings #-}
+module Discord (publish) where
 
-module Discord (alert) where
-
+import ClassyPrelude
+import Data.Aeson
+import Data.ByteString.Lazy
 import Network.HTTP.Simple
 import Data.String (fromString)
 import Control.Monad (void)
 
-alert :: String -> String -> IO ()
-alert webhookUrl message = do
+publish :: String -> Text -> IO ()
+publish webhookUrl message = do
 
   let request = setRequestMethod "POST"
        $ setRequestHeader "Content-Type" ["application/json"]
-       $ setRequestBodyLBS (fromString ("{\"content\":\"" ++ message ++ "\"}"))
+       $ setRequestBodyJSON (object [ "content" .= message ])
        $ fromString webhookUrl
 
   void $ httpNoBody request
