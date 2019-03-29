@@ -12,3 +12,11 @@ readNotForgingDelegates =
 writeNotForgingDelegates :: [Text] -> IO ()
 writeNotForgingDelegates =
   writeFileUtf8 "db_NotForgingDelegates.txt" . unlines
+
+readLowRankDelegates :: IO [Text]
+readLowRankDelegates =
+  lines <$> readFileUtf8 "db_LowRankDelegates.txt"
+
+writeLowRankDelegates :: [Text] -> IO ()
+writeLowRankDelegates =
+  writeFileUtf8 "db_LowRankDelegates.txt" . unlines

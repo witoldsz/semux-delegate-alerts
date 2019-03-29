@@ -17,17 +17,36 @@ main = do
   webhookUrl     <-          getEnv "WEBHOOK_URL"
   delegate       <- pack <$> getEnv "DELEGATE"
   alertAfterSecs <- read <$> getEnv "ALERT_AFTER_SECS" :: IO Int
+  alertRank      <- read <$> getEnv "ALERT_RANK" :: IO Int
 
-  now              <- getCurrentTime
-  lastCoinbase     <- getLastCoinbase semuxApi delegate
-  let diff         =  now `minus` lastCoinbase
-  let isNotForging =  diff > alertAfterSecs
+  (delegateDescr, rank) <- getDelegateInfo semuxApi delegate
+
+  lowRankDelegates <- readLowRankDelegates
+  let wasLowRank = delegate `elem` lowRankDelegates
+  let isLowRank = rank >= alertRank
+
+  case (isLowRank, wasLowRank) of
+
+    (True, False) -> do
+      let msg = delegateDescr <> " has low rank (≥ " <> tshow alertRank <> "). Get some votes!"
+      publish webhookUrl msg
+      putStrLn msg
+      writeLowRankDelegates (delegate : lowRankDelegates)
+
+    (False, True) -> do
+      let msg = delegateDescr <> " has rank OK now (< " <> tshow alertRank <> ")."
+      publish webhookUrl msg
+      putStrLn msg
+      writeLowRankDelegates $ filter (/= delegate) lowRankDelegates
+
+    _ -> return ()
 
   notForgingDelegates <- readNotForgingDelegates
   let wasNotForging   =  delegate `elem` notForgingDelegates
-
-  (delegateDescr, _) <- getDelegateInfo semuxApi delegate
-  -- TODO: new feature: publish warning when rank is too low
+  now                 <- getCurrentTime
+  lastCoinbase        <- getLastCoinbase semuxApi delegate
+  let diff            =  now `minus` lastCoinbase
+  let isNotForging    =  diff > alertAfterSecs
 
   case (isNotForging, wasNotForging) of
 
