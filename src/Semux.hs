@@ -27,7 +27,7 @@ getDelegateInfo semuxApi delegate = do
 
     info :: Delegate -> Int -> (Text, Int)
     info d rank =
-      ( _dAddress d <> " " <> _dName d <> " #" <> tshow rank
+      (_dName d <> " #" <> tshow rank
       , rank
       )
 
